@@ -238,5 +238,5 @@
         };
     </script>
 
-    <script src="{{ asset('assets/js/pages/_list.js') }}"></script>
+    <script src="{{ asset('vendor/genpack/js/pages/_list.js') }}"></script>
 @endpush

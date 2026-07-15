@@ -16,9 +16,14 @@ class GenpackServiceProvider extends ServiceProvider
         // Daftarkan views dari package agar bisa di-load oleh Laravel
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'genpack');
 
-        // Opsional: publish asset/views agar bisa dicustom oleh user
+        // Opsional: publish views agar bisa dicustom oleh user
         $this->publishes([
             __DIR__.'/../resources/views' => resource_path('views/vendor/genpack'),
         ], 'genpack-views');
+
+        // Publish JS assets ke folder public aplikasi Laravel
+        $this->publishes([
+            __DIR__.'/../resources/assets' => public_path('vendor/genpack'),
+        ], 'genpack-assets');
     }
 }
