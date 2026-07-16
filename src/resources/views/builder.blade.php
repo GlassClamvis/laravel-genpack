@@ -105,11 +105,12 @@ if (empty($modelsList)) {
         activeTab: 'controller',
         copied: false,
         modelsColumns: {{ json_encode($modelColumns) }},
-    
+        themeStyle: 'classic',
+
         get dbColumns() {
             return this.modelsColumns[this.selectedModel] || [];
         },
-    
+
         selectDbColumn(event) {
             let colName = event.target.value;
             if (!colName) return;
@@ -122,19 +123,19 @@ if (empty($modelsList)) {
                 this.newField.entity = '';
                 this.newField.attribute = 'nama';
                 this.newField.model = '';
-    
+
                 if (colData.name.endsWith('_id')) {
                     this.newField.type = 'select2_relationship';
                     let relBase = colData.name.slice(0, -3);
                     let relClean = relBase.replace(/^api_/, '');
                     let relCamel = relClean.replace(/_([a-z])/g, g => g[1].toUpperCase());
                     this.newField.entity = relCamel;
-    
+
                     let matched = this.models.find(m => {
                         let mClean = m.replace(/.*\\/, '').replace(/^M_Api/, '').replace(/^M_/, '').toLowerCase();
                         return mClean === relClean.replace(/_/g, '') || mClean === relBase.replace(/_/g, '');
                     });
-    
+
                     if (matched) {
                         this.newField.model = matched;
                         let relatedCols = this.modelsColumns[matched] || [];
@@ -144,7 +145,7 @@ if (empty($modelsList)) {
                         else if (hasName) this.newField.attribute = 'name';
                     }
                 }
-    
+
                 let label = colData.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 if (label.endsWith(' Id')) {
                     label = label.slice(0, -3) + ' ID';
@@ -153,7 +154,7 @@ if (empty($modelsList)) {
                 this.newField.placeholder = 'Pilih ' + label.toLowerCase() + '...';
             }
         },
-    
+
         addField() {
             if (!this.newField.name) {
                 alert('Nama field wajib diisi!');
@@ -165,23 +166,23 @@ if (empty($modelsList)) {
             this.fields.push({ ...this.newField });
             this.newField = { name: '', label: '', type: 'text', placeholder: '', required: false, col: 'col-md-6', dependsOn: '', entity: '', attribute: 'nama', model: '' };
         },
-    
+
         removeField(index) {
             this.fields.splice(index, 1);
         },
-    
+
         copyToClipboard(text) {
             navigator.clipboard.writeText(text);
             this.copied = true;
             setTimeout(() => this.copied = false, 2000);
         },
-    
+
         get controllerCode() {
             let modelClass = this.selectedModel;
             let parts = modelClass.split('\\');
             let modelBaseName = parts[parts.length - 1];
             let subNamespace = parts.length > 1 ? '\\' + parts.slice(0, -1).join('\\') : '';
-    
+            
             let controllerClass = modelBaseName + 'CrudController';
             let code = '<' + '?php\n\n';
             code += 'namespace App\\Http\\Controllers' + subNamespace + ';\n\n';
@@ -196,7 +197,12 @@ if (empty($modelsList)) {
             code += '        $this->crud->setModel(\\\\App\\\\Models\\\\' + modelClass + '::class);\n';
             code += '        $this->crud->setRoutePrefix(\'' + modelBaseName.toLowerCase() + '\');\n';
             code += '        $this->crud->setEntityNameStrings(\'' + modelBaseName + '\', \'' + modelBaseName + 's\');\n\n';
-    
+            code += '        $this->crud->setModalConfig([\n';
+            code += '            \'size\' => \'modal-lg\',\n';
+            code += '            \'fullscreen\' => false,\n';
+            code += '            \'scrollable\' => true\n';
+            code += '        ])->setThemeStyle(\'' + this.themeStyle + '\');\n\n';
+
             this.fields.forEach(f => {
                 code += '        $this->crud->addField([\n';
                 code += '            \'name\' => \'' + f.name + '\',\n';
@@ -230,7 +236,7 @@ if (empty($modelsList)) {
             code += '    }\n}';
             return code;
         },
-    
+
         get migrationCode() {
             let modelClass = this.selectedModel;
             let parts = modelClass.split('\\');
@@ -244,7 +250,7 @@ if (empty($modelsList)) {
             code += '    public function up(): void\n    {\n';
             code += '        Schema::create(\'' + tableName + '\', function (Blueprint $table) {\n';
             code += '            $table->id();\n';
-    
+
             this.fields.forEach(f => {
                 let mType = 'string';
                 if (f.type === 'textarea') mType = 'text';
@@ -253,25 +259,25 @@ if (empty($modelsList)) {
                 else if (f.type === 'flatpickr') mType = 'date';
                 else if (f.type === 'select2_multiple') mType = 'json';
                 else if (f.type === 'select2_relationship') mType = 'bigInteger';
-    
+
                 let line = '            $table->' + mType + '(\'' + f.name + '\')';
                 if (!f.required) {
                     line += '->nullable()';
                 }
                 code += line + ';\n';
             });
-    
+
             code += '            $table->timestamps();\n';
             code += '        });\n    }\n};';
             return code;
         },
-    
+
         get modelCode() {
             let modelClass = this.selectedModel;
             let parts = modelClass.split('\\');
             let modelBaseName = parts[parts.length - 1];
             let subNamespace = parts.length > 1 ? '\\' + parts.slice(0, -1).join('\\') : '';
-    
+            
             let fieldsStr = this.fields.map(f => '\'' + f.name + '\'').join(', ');
             let code = '<' + '?php\n\n';
             code += 'namespace App\\Models' + subNamespace + ';\n\n';
@@ -287,7 +293,8 @@ if (empty($modelsList)) {
         <!-- Sidebar / Field Configurator (4 columns) -->
         <section class="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-6 self-start">
             <!-- Model Dropdown (Deteksi Otomatis) -->
-            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2.5" x-data="{ isOpen: false, searchQuery: '' }"
+            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2.5"
+                x-data="{ isOpen: false, searchQuery: '' }"
                 @click.away="isOpen = false">
                 <div class="flex items-center gap-1.5">
                     <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -302,28 +309,26 @@ if (empty($modelsList)) {
                     <button type="button" @click="isOpen = !isOpen"
                         class="w-full flex items-center justify-between text-xs border border-indigo-200 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-slate-700 cursor-pointer text-left shadow-sm">
                         <span x-text="'App\\Models\\' + selectedModel"></span>
-                        <svg class="w-4 h-4 text-slate-400 transition-transform" :class="isOpen ? 'rotate-180' : ''"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
-                            </path>
+                        <svg class="w-4 h-4 text-slate-400 transition-transform" :class="isOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
-                    <div x-show="isOpen" x-transition
+                    <div x-show="isOpen"
+                        x-transition
                         class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg p-1.5 space-y-1">
-                        <input type="text" x-model="searchQuery" placeholder="Cari model..." @click.stop
+                        <input type="text" x-model="searchQuery" placeholder="Cari model..."
+                            @click.stop
                             class="w-full text-xs border border-slate-250 rounded-md p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none mb-1 font-medium">
                         <div class="max-h-48 overflow-y-auto space-y-0.5 scrollbar-thin">
-                            <template
-                                x-for="m in models.filter(item => ('App\\Models\\' + item).toLowerCase().includes(searchQuery.toLowerCase()))">
-                                <button type="button" @click="selectedModel = m; isOpen = false; searchQuery = '';"
-                                    :class="selectedModel === m ? 'bg-indigo-50 text-indigo-700 font-bold' :
-                                        'text-slate-750 hover:bg-slate-50'"
+                            <template x-for="m in models.filter(item => ('App\\Models\\' + item).toLowerCase().includes(searchQuery.toLowerCase()))">
+                                <button type="button"
+                                    @click="selectedModel = m; isOpen = false; searchQuery = '';"
+                                    :class="selectedModel === m ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-750 hover:bg-slate-50'"
                                     class="w-full text-left text-xs p-2 rounded-md transition-all font-semibold block truncate cursor-pointer">
                                     <span x-text="'App\\Models\\' + m"></span>
                                 </button>
                             </template>
-                            <template
-                                x-if="models.filter(item => ('App\\Models\\' + item).toLowerCase().includes(searchQuery.toLowerCase())).length === 0">
+                            <template x-if="models.filter(item => ('App\\Models\\' + item).toLowerCase().includes(searchQuery.toLowerCase())).length === 0">
                                 <div class="text-[11px] text-slate-400 text-center py-3">Model tidak ditemukan</div>
                             </template>
                         </div>
@@ -333,6 +338,18 @@ if (empty($modelsList)) {
                     *Membaca folder <code class="font-mono bg-indigo-100 px-1 py-0.5 rounded">app/Models/</code> secara
                     otomatis. Pilih model untuk menyesuaikan controller, migration, dan class model yang digenerate.
                 </p>
+            </div>
+
+            <!-- Theme Style Selection -->
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">🎨 Gaya Desain Tema (Theme Style)</label>
+                <select x-model="themeStyle"
+                    class="w-full text-xs border border-indigo-200 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-slate-700 cursor-pointer shadow-sm">
+                    <option value="classic">Standard Bootstrap 5 (Classic Accent)</option>
+                    <option value="porto">Porto Admin Theme v2.2 (Section Card, FontAwesome)</option>
+                    <option value="akorn">Akorn Admin Theme (Elegant Minimalist Card, Rounded Accent)</option>
+                </select>
+                <p class="text-[10px] text-indigo-600/80 leading-normal">*Menyesuaikan layout template controller CRUD yang digenerate.</p>
             </div>
 
             <hr class="border-slate-100" />
@@ -346,15 +363,12 @@ if (empty($modelsList)) {
             <div class="space-y-4">
                 <template x-if="dbColumns.length > 0">
                     <div>
-                        <label class="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">💡
-                            Pilih dari Kolom Database</label>
+                        <label class="block text-[10px] font-bold text-indigo-700 uppercase tracking-wider mb-1">💡 Pilih dari Kolom Database</label>
                         <select @change="selectDbColumn($event)"
                             class="w-full text-xs border border-indigo-200 rounded-lg p-2.5 bg-indigo-50/50 hover:bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-slate-700 cursor-pointer">
                             <option value="">-- Pilih kolom untuk auto-fill (Opsional) --</option>
                             <template x-for="col in dbColumns">
-                                <option :value="col.name"
-                                    x-text="col.name + ' (' + col.type + (col.required ? ' • required' : '') + ')'">
-                                </option>
+                                <option :value="col.name" x-text="col.name + ' (' + col.type + (col.required ? ' • required' : '') + ')'"></option>
                             </template>
                         </select>
                     </div>
@@ -426,8 +440,7 @@ if (empty($modelsList)) {
                 <template x-if="newField.type === 'select2_relationship'">
                     <div class="p-3.5 bg-indigo-50/50 border border-indigo-100 rounded-xl space-y-3">
                         <div>
-                            <label class="block text-[11px] font-bold text-indigo-800 uppercase tracking-wider mb-1">📦
-                                Model Relasi (Related Model)</label>
+                            <label class="block text-[11px] font-bold text-indigo-800 uppercase tracking-wider mb-1">📦 Model Relasi (Related Model)</label>
                             <select x-model="newField.model"
                                 class="w-full text-xs border border-indigo-200 bg-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-slate-700 cursor-pointer">
                                 <option value="">-- Pilih Model --</option>
@@ -438,22 +451,17 @@ if (empty($modelsList)) {
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label
-                                    class="block text-[11px] font-bold text-indigo-800 uppercase tracking-wider mb-1">🔗
-                                    Method Relasi</label>
+                                <label class="block text-[11px] font-bold text-indigo-800 uppercase tracking-wider mb-1">🔗 Method Relasi</label>
                                 <input type="text" x-model="newField.entity" placeholder="contoh: tahunAjaran"
                                     class="w-full text-xs border border-indigo-200 bg-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-slate-700">
                             </div>
                             <div>
-                                <label
-                                    class="block text-[11px] font-bold text-indigo-800 uppercase tracking-wider mb-1">🏷️
-                                    Atribut Relasi</label>
+                                <label class="block text-[11px] font-bold text-indigo-800 uppercase tracking-wider mb-1">🏷️ Atribut Relasi</label>
                                 <input type="text" x-model="newField.attribute" placeholder="contoh: nama"
                                     class="w-full text-xs border border-indigo-200 bg-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-slate-700">
                             </div>
                         </div>
-                        <p class="text-[10px] text-indigo-600/80 leading-normal">*Pilih model relasi, isi nama method
-                            Eloquent relationship, dan kolom yang ditampilkan.</p>
+                        <p class="text-[10px] text-indigo-600/80 leading-normal">*Pilih model relasi, isi nama method Eloquent relationship, dan kolom yang ditampilkan.</p>
                     </div>
                 </template>
 
@@ -583,9 +591,7 @@ if (empty($modelsList)) {
                                     <select
                                         class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-white shadow-sm outline-none font-semibold text-slate-700">
                                         <option x-text="field.placeholder || 'Pilih opsi (Relasi)...'"></option>
-                                        <option value="1"
-                                            x-text="'Pilihan dari ' + (field.model ? 'App\\Models\\' + field.model : 'Model Relasi')">
-                                        </option>
+                                        <option value="1" x-text="'Pilihan dari ' + (field.model ? 'App\\Models\\' + field.model : 'Model Relasi')"></option>
                                     </select>
                                     <span class="text-[9px] text-indigo-600 block leading-tight font-medium"
                                         x-text="'*Relasi: App\\Models\\' + (field.model || '...') + ' (' + (field.entity || '...') + ')'"></span>
